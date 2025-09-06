@@ -1,34 +1,36 @@
 from flask import Flask, render_template, request, jsonify
-import pickle
-import numpy as np
 import os
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__, static_folder="../frontend", template_folder="../frontend")
 
-# Load the trained model
-model_path = os.path.join(os.path.dirname(__file__), "..", "model.pkl")
-try:
-    with open(model_path, "rb") as file:
-        model = pickle.load(file)
-except FileNotFoundError:
-    print(f"Model file '{model_path}' not found.")
-    model = None
+# Simple prediction logic (replaces ML model for deployment)
+def predict_placement(cgpa, iq):
+    """
+    Simple prediction logic based on CGPA and IQ scores
+    This replaces the ML model for Vercel deployment
+    """
+    # Simple rule-based prediction
+    if cgpa >= 8.0 and iq >= 120:
+        return 1  # Will be placed
+    elif cgpa >= 7.0 and iq >= 110:
+        return 1  # Will be placed
+    elif cgpa >= 6.5 and iq >= 100:
+        return 1  # Will be placed
+    else:
+        return 0  # Will not be placed
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     prediction = None
     if request.method == "POST":
         try:
-            if model is None:
-                prediction = "❌ Model not loaded. Please check if model.pkl exists."
-            else:
-                cgpa = float(request.form["cgpa"])
-                iq = float(request.form["iq"])
+            cgpa = float(request.form["cgpa"])
+            iq = float(request.form["iq"])
 
-                # Predict using the model
-                result = model.predict(np.array([[cgpa, iq]]))[0]
-                prediction = "✅ Will be placed" if result == 1 else "❌ Will not be placed"
+            # Predict using simple logic
+            result = predict_placement(cgpa, iq)
+            prediction = "✅ Will be placed" if result == 1 else "❌ Will not be placed"
 
         except Exception as e:
             prediction = f"Error: {str(e)}"
@@ -38,15 +40,12 @@ def index():
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
-        if model is None:
-            return jsonify({"error": "Model not loaded"}), 500
-        
         data = request.get_json()
         cgpa = float(data["cgpa"])
         iq = float(data["iq"])
         
-        # Predict using the model
-        result = model.predict(np.array([[cgpa, iq]]))[0]
+        # Predict using simple logic
+        result = predict_placement(cgpa, iq)
         prediction = "Will be placed" if result == 1 else "Will not be placed"
         
         return jsonify({
