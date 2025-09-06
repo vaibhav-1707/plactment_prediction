@@ -1,137 +1,79 @@
+from http.server import BaseHTTPRequestHandler
+import urllib.parse
 import json
-import os
 
-def handler(request):
-    """
-    Simple HTTP handler for Vercel
-    """
-    try:
-        # Get the request method and path
-        method = request.get('REQUEST_METHOD', 'GET')
-        path = request.get('PATH_INFO', '/')
-        
-        # Handle different routes
-        if path == '/' and method == 'GET':
-            return {
-                'statusCode': 200,
-                'headers': {
-                    'Content-Type': 'text/html',
-                },
-                'body': get_html_form()
-            }
-        
-        elif path == '/' and method == 'POST':
-            # Parse form data
-            content_length = int(request.get('CONTENT_LENGTH', 0))
-            if content_length > 0:
-                post_data = request.get('wsgi.input', '').read(content_length).decode('utf-8')
-                form_data = parse_form_data(post_data)
-                
-                try:
-                    cgpa = float(form_data.get('cgpa', 0))
-                    iq = float(form_data.get('iq', 0))
-                    
-                    # Simple prediction logic
-                    result = predict_placement(cgpa, iq)
-                    prediction = "✅ Will be placed" if result == 1 else "❌ Will not be placed"
-                    
-                    return {
-                        'statusCode': 200,
-                        'headers': {
-                            'Content-Type': 'text/html',
-                        },
-                        'body': get_html_form(prediction)
-                    }
-                except Exception as e:
-                    return {
-                        'statusCode': 200,
-                        'headers': {
-                            'Content-Type': 'text/html',
-                        },
-                        'body': get_html_form(f"Error: {str(e)}")
-                    }
-        
-        elif path == '/predict' and method == 'POST':
-            # Handle JSON API
-            content_length = int(request.get('CONTENT_LENGTH', 0))
-            if content_length > 0:
-                post_data = request.get('wsgi.input', '').read(content_length).decode('utf-8')
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        self.wfile.write(get_html_form().encode())
+
+    def do_POST(self):
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = self.rfile.read(content_length).decode('utf-8')
+
+        if self.path == '/predict':  # JSON API
+            try:
                 data = json.loads(post_data)
-                
-                try:
-                    cgpa = float(data.get('cgpa', 0))
-                    iq = float(data.get('iq', 0))
-                    
-                    result = predict_placement(cgpa, iq)
-                    prediction = "Will be placed" if result == 1 else "Will not be placed"
-                    
-                    return {
-                        'statusCode': 200,
-                        'headers': {
-                            'Content-Type': 'application/json',
-                        },
-                        'body': json.dumps({
-                            'prediction': prediction,
-                            'placed': bool(result)
-                        })
-                    }
-                except Exception as e:
-                    return {
-                        'statusCode': 400,
-                        'headers': {
-                            'Content-Type': 'application/json',
-                        },
-                        'body': json.dumps({'error': str(e)})
-                    }
-        
-        # Default response
-        return {
-            'statusCode': 404,
-            'headers': {
-                'Content-Type': 'text/html',
-            },
-            'body': '<h1>404 - Not Found</h1>'
-        }
-        
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'text/html',
-            },
-            'body': f'<h1>500 - Server Error</h1><p>{str(e)}</p>'
-        }
+                cgpa = float(data.get('cgpa', 0))
+                iq = float(data.get('iq', 0))
+                result = predict_placement(cgpa, iq)
+                prediction = "Will be placed" if result == 1 else "Will not be placed"
+
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    'prediction': prediction,
+                    'placed': bool(result)
+                }).encode())
+            except Exception as e:
+                self.send_response(400)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode())
+
+        else:  # Form submission
+            form_data = parse_form_data(post_data)
+            try:
+                cgpa = float(form_data.get('cgpa', 0))
+                iq = float(form_data.get('iq', 0))
+                result = predict_placement(cgpa, iq)
+                prediction = "✅ Will be placed" if result == 1 else "❌ Will not be placed"
+
+                self.send_response(200)
+                self.send_header("Content-type", "text/html")
+                self.end_headers()
+                self.wfile.write(get_html_form(prediction).encode())
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-type", "text/html")
+                self.end_headers()
+                self.wfile.write(get_html_form(f"Error: {str(e)}").encode())
+
 
 def predict_placement(cgpa, iq):
-    """
-    Simple prediction logic based on CGPA and IQ scores
-    """
     if cgpa >= 8.0 and iq >= 120:
-        return 1  # Will be placed
+        return 1
     elif cgpa >= 7.0 and iq >= 110:
-        return 1  # Will be placed
+        return 1
     elif cgpa >= 6.5 and iq >= 100:
-        return 1  # Will be placed
+        return 1
     else:
-        return 0  # Will not be placed
+        return 0
 
 def parse_form_data(data):
-    """
-    Parse form data from POST request
-    """
     form_data = {}
     if data:
         pairs = data.split('&')
         for pair in pairs:
             if '=' in pair:
                 key, value = pair.split('=', 1)
-                form_data[key] = value.replace('+', ' ')
+                form_data[key] = urllib.parse.unquote_plus(value)
     return form_data
 
 def get_html_form(prediction=None):
-    """
-    Generate HTML form
-    """
     prediction_html = ""
     if prediction:
         css_class = "success" if "✅" in prediction else "error"
