@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import pickle
 import numpy as np
 import os
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__, static_folder="../frontend", template_folder="../frontend")
 
@@ -55,9 +56,12 @@ def predict():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+# Apply ProxyFix to handle Vercel's proxying
+app.wsgi_app = ProxyFix(app.wsgi_app)
+
 # Vercel serverless function handler
-def handler(request):
-    return app(request.environ, lambda status, headers: None)
+def handler(environ, start_response):
+    return app(environ, start_response)
 
 if __name__ == "__main__":
     app.run(debug=True)
