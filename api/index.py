@@ -7,62 +7,55 @@ def handler(event, context):
     body = event.get("body", "")
 
     if method == "GET":
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "text/html"},
-            "body": get_html_form()
-        }
+        return response_html(get_html_form())
 
-    elif method == "POST":
-        if path == "/predict":  # JSON API
+    if method == "POST":
+        if path == "/predict":
             try:
                 data = json.loads(body)
                 cgpa = float(data.get('cgpa', 0))
                 iq = float(data.get('iq', 0))
                 result = predict_placement(cgpa, iq)
-                prediction = "Will be placed" if result == 1 else "Will not be placed"
-
-                return {
-                    "statusCode": 200,
-                    "headers": {"Content-Type": "application/json"},
-                    "body": json.dumps({
-                        "prediction": prediction,
-                        "placed": bool(result)
-                    })
-                }
+                return response_json({
+                    "prediction": "Will be placed" if result else "Will not be placed",
+                    "placed": bool(result)
+                })
             except Exception as e:
-                return {
-                    "statusCode": 400,
-                    "headers": {"Content-Type": "application/json"},
-                    "body": json.dumps({"error": str(e)})
-                }
-
-        else:  # Handle HTML form submission
+                return response_json({"error": str(e)}, 400)
+        else:
             form_data = parse_form_data(body)
             try:
                 cgpa = float(form_data.get('cgpa', 0))
                 iq = float(form_data.get('iq', 0))
                 result = predict_placement(cgpa, iq)
-                prediction = "✅ Will be placed" if result == 1 else "❌ Will not be placed"
-
-                return {
-                    "statusCode": 200,
-                    "headers": {"Content-Type": "text/html"},
-                    "body": get_html_form(prediction)
-                }
+                prediction = "✅ Will be placed" if result else "❌ Will not be placed"
+                return response_html(get_html_form(prediction))
             except Exception as e:
-                return {
-                    "statusCode": 500,
-                    "headers": {"Content-Type": "text/html"},
-                    "body": get_html_form(f"Error: {str(e)}")
-                }
+                return response_html(get_html_form(f"Error: {str(e)}"), 500)
 
+    return response_text("Not Found", 404)
+
+
+def response_html(html, status=200):
     return {
-        "statusCode": 404,
-        "headers": {"Content-Type": "text/plain"},
-        "body": "Not Found"
+        "statusCode": status,
+        "headers": {"Content-Type": "text/html"},
+        "body": html
     }
 
+def response_json(data, status=200):
+    return {
+        "statusCode": status,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps(data)
+    }
+
+def response_text(text, status=200):
+    return {
+        "statusCode": status,
+        "headers": {"Content-Type": "text/plain"},
+        "body": text
+    }
 
 def predict_placement(cgpa, iq):
     if cgpa >= 8.0 and iq >= 120:
@@ -71,27 +64,22 @@ def predict_placement(cgpa, iq):
         return 1
     elif cgpa >= 6.5 and iq >= 100:
         return 1
-    else:
-        return 0
-
+    return 0
 
 def parse_form_data(data):
     form_data = {}
     if data:
-        pairs = data.split('&')
-        for pair in pairs:
+        for pair in data.split('&'):
             if '=' in pair:
                 key, value = pair.split('=', 1)
                 form_data[key] = urllib.parse.unquote_plus(value)
     return form_data
-
 
 def get_html_form(prediction=None):
     prediction_html = ""
     if prediction:
         css_class = "success" if "✅" in prediction else "error"
         prediction_html = f'<div class="prediction {css_class}">{prediction}</div>'
-    
     return f"""
     <!DOCTYPE html>
     <html>
@@ -103,7 +91,7 @@ def get_html_form(prediction=None):
             h1 {{ color: #333; text-align: center; }}
             .form-group {{ margin: 15px 0; }}
             label {{ display: block; margin-bottom: 5px; font-weight: bold; }}
-            input {{ width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }}
+            input {{ width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }}
             button {{ background: #007bff; color: white; padding: 12px 30px; border: none; border-radius: 5px; cursor: pointer; width: 100%; }}
             button:hover {{ background: #0056b3; }}
             .prediction {{ margin-top: 20px; padding: 15px; border-radius: 5px; text-align: center; font-weight: bold; }}
