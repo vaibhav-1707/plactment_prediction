@@ -1,56 +1,62 @@
-from http.server import BaseHTTPRequestHandler
-import urllib.parse
 import json
+import urllib.parse
 
-class handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.end_headers()
-        self.wfile.write(get_html_form().encode())
+def handler(request):
+    method = request["method"]
+    path = request["path"]
+    
+    if method == "GET":
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "text/html"},
+            "body": get_html_form()
+        }
 
-    def do_POST(self):
-        content_length = int(self.headers.get('Content-Length', 0))
-        post_data = self.rfile.read(content_length).decode('utf-8')
+    elif method == "POST":
+        body = request.get("body", "")
 
-        if self.path == '/predict':  # JSON API
+        if path == "/predict":  # JSON API
             try:
-                data = json.loads(post_data)
+                data = json.loads(body)
                 cgpa = float(data.get('cgpa', 0))
                 iq = float(data.get('iq', 0))
                 result = predict_placement(cgpa, iq)
                 prediction = "Will be placed" if result == 1 else "Will not be placed"
 
-                self.send_response(200)
-                self.send_header("Content-type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({
-                    'prediction': prediction,
-                    'placed': bool(result)
-                }).encode())
+                return {
+                    "statusCode": 200,
+                    "headers": {"Content-Type": "application/json"},
+                    "body": json.dumps({
+                        "prediction": prediction,
+                        "placed": bool(result)
+                    })
+                }
             except Exception as e:
-                self.send_response(400)
-                self.send_header("Content-type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({'error': str(e)}).encode())
+                return {
+                    "statusCode": 400,
+                    "headers": {"Content-Type": "application/json"},
+                    "body": json.dumps({"error": str(e)})
+                }
 
         else:  # Form submission
-            form_data = parse_form_data(post_data)
+            form_data = parse_form_data(body)
             try:
                 cgpa = float(form_data.get('cgpa', 0))
                 iq = float(form_data.get('iq', 0))
                 result = predict_placement(cgpa, iq)
                 prediction = "✅ Will be placed" if result == 1 else "❌ Will not be placed"
 
-                self.send_response(200)
-                self.send_header("Content-type", "text/html")
-                self.end_headers()
-                self.wfile.write(get_html_form(prediction).encode())
+                return {
+                    "statusCode": 200,
+                    "headers": {"Content-Type": "text/html"},
+                    "body": get_html_form(prediction)
+                }
             except Exception as e:
-                self.send_response(500)
-                self.send_header("Content-type", "text/html")
-                self.end_headers()
-                self.wfile.write(get_html_form(f"Error: {str(e)}").encode())
+                return {
+                    "statusCode": 500,
+                    "headers": {"Content-Type": "text/html"},
+                    "body": get_html_form(f"Error: {str(e)}")
+                }
 
 
 def predict_placement(cgpa, iq):
@@ -63,6 +69,7 @@ def predict_placement(cgpa, iq):
     else:
         return 0
 
+
 def parse_form_data(data):
     form_data = {}
     if data:
@@ -72,6 +79,7 @@ def parse_form_data(data):
                 key, value = pair.split('=', 1)
                 form_data[key] = urllib.parse.unquote_plus(value)
     return form_data
+
 
 def get_html_form(prediction=None):
     prediction_html = ""
