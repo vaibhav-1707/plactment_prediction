@@ -1,10 +1,11 @@
 import json
 import urllib.parse
 
-def handler(request):
-    method = request["method"]
-    path = request["path"]
-    
+def handler(event, context):
+    method = event.get("method", "GET")
+    path = event.get("path", "/")
+    body = event.get("body", "")
+
     if method == "GET":
         return {
             "statusCode": 200,
@@ -13,8 +14,6 @@ def handler(request):
         }
 
     elif method == "POST":
-        body = request.get("body", "")
-
         if path == "/predict":  # JSON API
             try:
                 data = json.loads(body)
@@ -38,7 +37,7 @@ def handler(request):
                     "body": json.dumps({"error": str(e)})
                 }
 
-        else:  # Form submission
+        else:  # Handle HTML form submission
             form_data = parse_form_data(body)
             try:
                 cgpa = float(form_data.get('cgpa', 0))
@@ -57,6 +56,12 @@ def handler(request):
                     "headers": {"Content-Type": "text/html"},
                     "body": get_html_form(f"Error: {str(e)}")
                 }
+
+    return {
+        "statusCode": 404,
+        "headers": {"Content-Type": "text/plain"},
+        "body": "Not Found"
+    }
 
 
 def predict_placement(cgpa, iq):
