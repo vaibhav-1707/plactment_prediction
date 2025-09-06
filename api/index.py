@@ -22,7 +22,6 @@ def predict_placement(cgpa, iq):
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    prediction = None
     if request.method == "POST":
         try:
             cgpa = float(request.form["cgpa"])
@@ -34,8 +33,49 @@ def index():
 
         except Exception as e:
             prediction = f"Error: {str(e)}"
+    else:
+        prediction = None
 
-    return render_template("index.html", prediction=prediction)
+    # Return simple HTML instead of template
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Placement Prediction</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }}
+            .container {{ background: #f5f5f5; padding: 30px; border-radius: 10px; }}
+            h1 {{ color: #333; text-align: center; }}
+            .form-group {{ margin: 15px 0; }}
+            label {{ display: block; margin-bottom: 5px; font-weight: bold; }}
+            input {{ width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }}
+            button {{ background: #007bff; color: white; padding: 12px 30px; border: none; border-radius: 5px; cursor: pointer; width: 100%; }}
+            button:hover {{ background: #0056b3; }}
+            .prediction {{ margin-top: 20px; padding: 15px; border-radius: 5px; text-align: center; font-weight: bold; }}
+            .success {{ background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }}
+            .error {{ background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🎯 Placement Prediction</h1>
+            <form method="POST">
+                <div class="form-group">
+                    <label for="cgpa">CGPA (0-10):</label>
+                    <input type="number" id="cgpa" name="cgpa" step="0.1" min="0" max="10" required>
+                </div>
+                <div class="form-group">
+                    <label for="iq">IQ Score:</label>
+                    <input type="number" id="iq" name="iq" min="50" max="200" required>
+                </div>
+                <button type="submit">🔮 Predict Placement</button>
+            </form>
+            {f'<div class="prediction {"success" if prediction and "✅" in prediction else "error" if prediction else ""}">{prediction}</div>' if prediction else ''}
+        </div>
+    </body>
+    </html>
+    """
+    return html
 
 @app.route("/predict", methods=["POST"])
 def predict():
